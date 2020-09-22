@@ -577,7 +577,8 @@ ISO_EXTERN ( ISOErr ) ISOAddItemExtentItem( ISOMetaItem item, ISOMetaItem extent
     extent->extent_length = length;
     extent->extent_offset = offset;
     
-    err = ISOAddItemReference(item, MP4_FOUR_CHAR_CODE('i', 'l', 'o', 'c'), extentItem->item_ID, &index);  if (err) goto bail;
+    err = ISOAddItemReference(item, MP4_FOUR_CHAR_CODE('i', 'l', 'o', 'c'), extentItem->item_ID, &index);
+		if (err) goto bail;
     
     extent->extent_index = index;
     
@@ -1399,7 +1400,8 @@ ISO_EXTERN ( ISOErr ) ISOGetItemData( ISOMetaItem item, MP4Handle data, u64* bas
                 else if (myItem->construction_method == 2)
                 {
                     u64 k;
-                    err = ISOGetItemReference(item, MP4_FOUR_CHAR_CODE('i', 'l', 'o', 'c'), b->extent_index, &referenceItem); if (err) goto bail;
+                    err = ISOGetItemReference(item, MP4_FOUR_CHAR_CODE('i', 'l', 'o', 'c'), b->extent_index, &referenceItem);
+										if (err) goto bail;
                     err = MP4NewHandle(0, &referenceItemData); if (err) goto bail;
                     err = ISOGetItemData( referenceItem, referenceItemData, &k ); if (err) goto bail;
                     err = MP4GetHandleSize(referenceItemData, &length); if (err) goto bail;
@@ -1429,7 +1431,8 @@ ISO_EXTERN ( ISOErr ) ISOGetItemData( ISOMetaItem item, MP4Handle data, u64* bas
                 u64 k;
                 u32 referenceDataLength;
                 
-                err = ISOGetItemReference(item, MP4_FOUR_CHAR_CODE('i', 'l', 'o', 'c'), b->extent_index, &referenceItem); if (err) goto bail;
+                err = ISOGetItemReference(item, MP4_FOUR_CHAR_CODE('i', 'l', 'o', 'c'), b->extent_index, &referenceItem);
+								if (err) goto bail;
                 err = MP4NewHandle(0, &referenceItemData); if (err) goto bail;
                 err = ISOGetItemData( referenceItem, referenceItemData, &k ); if (err) goto bail;
                 err = MP4GetHandleSize(referenceItemData, &referenceDataLength); if (err) goto bail;
