@@ -1,17 +1,37 @@
+'''
+This script requires: `grep` and `curl`
+
+It will scan your spec docx for fourcc's and look if those are occuring somewhere in the code.
+It will also load most recent fourcc's from mp4ra and check if they are actually registered.
+If you have .doc files plese save them as .docx first. doc's are not supported.
+
+example usage:
+
+check all specs
+python3 checkCoverage.py  --text ~/Box/MPEG/14496-30_timedText/w16794-TextOf-14496-30-2ndEd.docx \
+                          --mp4 ~/Box/MPEG/14496-14_MP4/w17593_FDIS14496-14_F7+COR1+AMD1-R1-ITTF.docx \
+                          --nal ~/Box/MPEG/14496-15_NAL/14496-15_5th.docx \
+                          --heif ~/Box/MPEG/23008-12_HEIF/w18310_23008-12_Ed2_FDIS+COR1_R1.docx \
+                          --isobmff ~/Box/MPEG/14496-12_ISOBMFF/14496-12_6th.docx
+
+check specific fourcc's by providing a comma separated values:
+python3 checkCoverage.py -i init,avc1,ftyp
+'''
+
 import sys
 import re
 import subprocess
 import argparse
 from docx2python import docx2python
+import csv, io
 
 __author__ = "Dimitri Podborski"
 __version__ = "0.1"
-__status__ = "Development"
 
 def print_message(msg):
-    print("\n" + "#" * 80)
+    print("\n" + "#" * 70)
     print("### " + str(msg))
-    print("#" * 80 + "\n")
+    print("#" * 70 + "\n")
 
 def command_to_string(command):
   cmd = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
@@ -21,7 +41,7 @@ def command_to_string(command):
     sys.exit(-1)
   return cmd_out.decode("utf-8") 
 
-def get_fourccs(full_text):
+def get_fourccs_software(full_text):
   fourccs = []
   sources = []
   for line in full_text.splitlines():
@@ -39,9 +59,9 @@ def get_fourccs(full_text):
   return {  'fourccs': fourccs,
             'sources': sources }
 
-def find_fcc(fcc, fccs):
-  sources = fccs.get('sources')
+def get_sources(fcc, fccs):
   retVal = []
+  sources = fccs.get('sources')
   full_list = fccs.get('fourccs')
   for i in range(len(full_list)):
     if full_list[i] == fcc:
@@ -62,7 +82,6 @@ def get_fourccs_docx(filepath):
     sources.append(line[7][0].replace('\u200e', ''))
     descriptions.append(line[8][0])
 
-
   return {  'fourccs': fourccs,
             'sources': sources,
             'descriptions': descriptions }
@@ -79,7 +98,7 @@ def check_isobmff_light(args, fccs):
   implemented = []
 
   for i in range(len(docx_fccs)):
-    supported = find_fcc(docx_fccs[i], fccs)
+    supported = get_sources(docx_fccs[i], fccs)
     if not supported:
       not_implemented.append('{}\t Sec.: {}\t\t{}'.format(docx_fccs[i], docx_srcs[i], docx_descr[i]))
     else:
@@ -99,11 +118,11 @@ def process_fccs(fccs):
   block_list = [' or ', ' to ', '.mp4', ', ‘C', 'A’, ', '?vc?', '1111', 'NOTE']
   fccs = list(set(fccs)) # remove dups
   fccs.sort() # sort
-  fccs = [x for x in fccs if x not in block_list] # filter
+  fccs = [x.replace(u'\u00A0', ' ') for x in fccs if x not in block_list] # filter + replace no-break spaces
   return fccs
 
 
-def check_full_doc(filepath, fccs, verbose = False, mp4ra = None):
+def check_full_doc(filepath, fccs_sw, verbose = False, mp4ra = None, spec = None):
   if not filepath:
     return
   if not filepath[-4:] == 'docx':
@@ -124,46 +143,68 @@ def check_full_doc(filepath, fccs, verbose = False, mp4ra = None):
     else:
       print("FCC \tSTATUS")
     for fcc in fccs_doc:
-      found = find_fcc(fcc, fccs)
-      if not found:
+      found_sources = get_sources(fcc, fccs_sw)
+      if not found_sources:
         print("{}\tNO".format(fcc))
       elif verbose:
-        print("{}\tOK\t{}".format(fcc, found[0]))
-        for n in range(1, len(found)):
-          print("    \t  \t{}".format(found[n]))
+        print("{}\tOK\t{}".format(fcc, found_sources[0]))
+        for n in range(1, len(found_sources)):
+          print("    \t  \t{}".format(found_sources[n]))
   else:
-    print("FCC \tSPEC\tDESCRIPTION")
+    print('{:<10}{:<15}{}'.format('FCC', 'SPEC', 'DESCRIPTION'))
     for fcc in fccs_doc:
-      found = find_fcc(fcc, fccs)
-      if not found:
+      found_sources = get_sources(fcc, fccs_sw)
+      if not found_sources:
         mp4ra_entry = [x for x in mp4ra if x[0] == fcc]
-        if mp4ra_entry:
-          print('{}\t{}\t{}'.format(fcc, mp4ra_entry[0][2], mp4ra_entry[0][1]))
-        else:
-          print('{}'.format(fcc))
-    
+        if len(mp4ra_entry) == 1:
+          print('{:<10}{:<15}{}'.format(fcc, mp4ra_entry[0][1], mp4ra_entry[0][2]))
+        elif len(mp4ra_entry) > 1:
+          spec_entries = [x for x in mp4ra_entry if spec in x[1]]
+          for entry in spec_entries:
+            print('{:<10}{:<15}{}'.format(fcc, entry[1], entry[2]))
+        elif verbose:
+          print('{:<10}{:<15}{}'.format(fcc,'----', 'Not implemented and not on mp4ra'))
 
 
 def get_mp4ra_fccs():
+  retVal = []
   base_url = 'https://raw.githubusercontent.com/mp4ra/mp4ra.github.io/dev/CSV/'
-  files = ['boxes-qt.csv', 'boxes-udta.csv', 'boxes.csv', 'brands.csv', 'checksum-types.csv', 'color-types.csv', 'data-references.csv', 'entity-groups.csv', 'handlers.csv', 'item-properties.csv', 'item-references.csv', 'item-types.csv', 'knownduplicates.csv', 'multiview-attributes.csv', 'oti.csv', 'sample-entries-boxes.csv', 'sample-entries-qt.csv', 'sample-entries.csv', 'sample-groups.csv', 'schemes.csv', 'specifications.csv', 'stream-types.csv', 'textualcontent.csv', 'track-groups.csv', 'track-references-qt.csv', 'track-references.csv', 'track-selection.csv', 'unlisted.csv' ]
+  files = ['boxes-qt.csv', 'boxes-udta.csv', 'boxes.csv', 'brands.csv', 'checksum-types.csv', 'color-types.csv', 'data-references.csv', 'entity-groups.csv', 'handlers.csv', 'item-properties.csv', 'item-references.csv', 'item-types.csv', 'multiview-attributes.csv', 'sample-entries-boxes.csv', 'sample-entries-qt.csv', 'sample-entries.csv', 'sample-groups.csv', 'schemes.csv', 'specifications.csv', 'track-groups.csv', 'track-references-qt.csv', 'track-references.csv', 'track-selection.csv' ]
   
   print_message("Download fccs from mp4ra")
 
-  alltext = ''
   for f in files:
     url = base_url + f
     print("Download: {}".format(url))
 
-    temp = command_to_string('curl -s ' + url)
-    alltext += '\n' + temp
-  
-  retVal = []
-  for line in alltext.splitlines():
-    if len(line) == 0 or line[0:4] == 'code':
-      continue
-    temp = line.split(',')
-    retVal.append(temp)
+    alltext = command_to_string('curl -s ' + url)
+
+    csvReader = csv.DictReader(io.StringIO(alltext))
+    headers = csvReader.fieldnames
+    if 'code' in headers:
+      for row in csvReader:
+        csvCode = row['code'].replace('$20', ' ')
+        if 'description' in headers:
+          csvDesc = row['description']
+        else:
+          csvDesc = ''
+        if 'specification' in headers:
+          csvSpec = row['specification']
+        else:
+          csvSpec = ''
+        if 'handler' in headers:
+          csvHandle = row['handler']
+        else:
+          csvHandle = ''
+        if 'ObjectType' in headers:
+          csvObjectType = row['ObjectType']
+        else:
+          csvObjectType = ''
+        if 'type' in headers:
+          csvType = row['type']
+        else:
+          csvType = ''
+        retVal.append([csvCode, csvSpec, csvDesc, csvHandle, csvObjectType, csvType])
   return retVal
 
 def main():
@@ -188,14 +229,14 @@ def main():
 
   command = 'grep -rnw IsoLib --include=\*.{cpp,c,cc,cs,h,hpp} -e "MP4_FOUR_CHAR_CODE"'
   grep_text = command_to_string( command )
-  fccs = get_fourccs( grep_text )
+  fccs_sw = get_fourccs_software( grep_text )
 
   # user only wants to check specific fourcc's
   if args.i:
     print("FCC \tSTATUS\tLOCATION")
     for fcc in args.i.split(','):
       fcc = fcc.replace('_', ' ')
-      found = find_fcc(fcc, fccs)
+      found = get_sources(fcc, fccs_sw)
       if not found:
         print("{}\tNO".format(fcc))
       else:
@@ -204,28 +245,27 @@ def main():
           print("    \t  \t{}".format(found[n]))
     sys.exit(-1)
 
-
   mp4ra = get_mp4ra_fccs()
   
   if not args.isobmff == None:
     print_message("Check coverage of ISO/IEC 14496-12")
-    check_full_doc(args.isobmff, fccs, args.v, mp4ra)
+    check_full_doc(args.isobmff, fccs_sw, args.v, mp4ra, "ISO")
   else:
     print_message("Check coverage of ISO/IEC 14496-12 (light mode)")
     print("only checking Table 1 located in isobmff_table1.docx")
-    check_isobmff_light(args, fccs)
+    check_isobmff_light(args, fccs_sw)
   if not args.mp4 == None:
     print_message("Check coverage of ISO/IEC 14496-14")
-    check_full_doc(args.mp4, fccs, args.v, mp4ra)
+    check_full_doc(args.mp4, fccs_sw, args.v, mp4ra, "MP4")
   if not args.nal == None:
     print_message("Check coverage of ISO/IEC 14496-15")
-    check_full_doc(args.nal, fccs, args.v, mp4ra)
+    check_full_doc(args.nal, fccs_sw, args.v, mp4ra, "NAL")
   if not args.text == None:
     print_message("Check coverage of ISO/IEC 14496-30")
-    check_full_doc(args.text, fccs, args.v, mp4ra)
+    check_full_doc(args.text, fccs_sw, args.v, mp4ra, "ISO-Text")
   if not args.heif == None:
     print_message("Check coverage of ISO/IEC 23008-12")
-    check_full_doc(args.heif, fccs, args.v, mp4ra)
+    check_full_doc(args.heif, fccs_sw, args.v, mp4ra, "HEIF")
 
 # run
 if __name__ == '__main__':
