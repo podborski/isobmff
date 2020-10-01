@@ -24,6 +24,7 @@ import subprocess
 import argparse
 from docx2python import docx2python
 import csv, io
+import operator
 
 __author__ = "Dimitri Podborski"
 __version__ = "0.1"
@@ -115,7 +116,7 @@ def check_isobmff_light(args, fccs):
     print(line)
 
 def process_fccs(fccs):
-  block_list = [' or ', ' to ', '.mp4', ', ‘C', 'A’, ', '?vc?', '1111', 'NOTE']
+  block_list = [' or ', ' to ', '.mp4', ', ‘C', 'A’, ', '?vc?', '1111', 'NOTE', 'tier']
   fccs = list(set(fccs)) # remove dups
   fccs.sort() # sort
   fccs = [x.replace(u'\u00A0', ' ') for x in fccs if x not in block_list] # filter + replace no-break spaces
@@ -127,7 +128,7 @@ def check_full_doc(filepath, fccs_sw, verbose = False, mp4ra = None, spec = None
     return
   if not filepath[-4:] == 'docx':
     print("WARNING: {} is not a docx file and will be ignored.".format(filepath))
-    return
+    return  
 
   doc_obj = docx2python(filepath)
 
@@ -151,29 +152,89 @@ def check_full_doc(filepath, fccs_sw, verbose = False, mp4ra = None, spec = None
         for n in range(1, len(found_sources)):
           print("    \t  \t{}".format(found_sources[n]))
   else:
-    print('{:<10}{:<15}{}'.format('FCC', 'SPEC', 'DESCRIPTION'))
+    not_supported_fccs = [] # those are not yet implemented
+    supported_fccs = [] # those are implemented
     for fcc in fccs_doc:
       found_sources = get_sources(fcc, fccs_sw)
       if not found_sources:
-        mp4ra_entry = [x for x in mp4ra if x[0] == fcc]
+        not_supported_fccs.append(fcc)
+      else:
+        supported_fccs.append([fcc, found_sources])
+
+    # go through each not supported 4cc and look for it in mp4ra tables
+    list_to_print = []
+    for fcc in not_supported_fccs:
+      found_at_mp4ra = False
+      for key in mp4ra:
+        if key == 'excluded':
+          continue
+        mp4ra_entry = [x for x in mp4ra[key] if x[0] == fcc]
         if len(mp4ra_entry) == 1:
-          print('{:<10}{:<15}{}'.format(fcc, mp4ra_entry[0][1], mp4ra_entry[0][2]))
+          list_to_print.append([fcc, mp4ra_entry[0][1], key, mp4ra_entry[0][2], mp4ra_entry[0][3], mp4ra_entry[0][4], mp4ra_entry[0][5]])
+          found_at_mp4ra = True
         elif len(mp4ra_entry) > 1:
-          spec_entries = [x for x in mp4ra_entry if spec in x[1]]
-          for entry in spec_entries:
-            print('{:<10}{:<15}{}'.format(fcc, entry[1], entry[2]))
-        elif verbose:
-          print('{:<10}{:<15}{}'.format(fcc,'----', 'Not implemented and not on mp4ra'))
+          print_message("WARNING: mp4ra csv has more than one 4CC in the same file. This should never happen! '{}' in '{}'".format(fcc, key))
+          sys.exit(-1)
+      if not found_at_mp4ra:
+        mp4ra_excluded = [x for x in mp4ra['excluded'] if x[0] == fcc]
+        if len(mp4ra_excluded) == 0:
+          print("NOTE: it seems that '{}' is not yet registered at mp4ra.".format(fcc))
+    
+    list_to_print = sorted(list_to_print, key = operator.itemgetter(2, 0))
+    print('{:<8}{:<14}{:<18}{}'.format('FCC', 'SPEC', 'CETEGORY', 'DESCRIPTION'))
+    for entry in list_to_print:
+      print('{:<8}{:<14}{:<18}{}'.format(entry[0], entry[1], entry[2], entry[3]))
 
 
 def get_mp4ra_fccs():
+  print_message("Get all fccs from mp4ra")
+
+  boxes = get_mp4ra_csvs(['boxes-qt.csv', 'boxes-udta.csv', 'boxes.csv'])
+  brands = get_mp4ra_csvs(['brands.csv'])
+  checksum_types = get_mp4ra_csvs(['checksum-types.csv'])
+  color_types = get_mp4ra_csvs(['color-types.csv'])
+  data_references = get_mp4ra_csvs(['data-references.csv'])
+  entity_groups = get_mp4ra_csvs(['entity-groups.csv'])
+  handlers = get_mp4ra_csvs(['handlers.csv'])
+  item_properties = get_mp4ra_csvs(['item-properties.csv'])
+  item_references = get_mp4ra_csvs(['item-references.csv'])
+  item_types = get_mp4ra_csvs(['item-types.csv'])
+  multiview_attributes = get_mp4ra_csvs(['multiview-attributes.csv'])
+  sample_entries = get_mp4ra_csvs(['sample-entries-boxes.csv', 'sample-entries-qt.csv', 'sample-entries.csv'])
+  sample_groups = get_mp4ra_csvs(['sample-groups.csv'])
+  schemes = get_mp4ra_csvs(['schemes.csv'])
+  track_groups = get_mp4ra_csvs(['track-groups.csv'])
+  track_references = get_mp4ra_csvs(['track-references-qt.csv', 'track-references.csv'])
+  track_selection = get_mp4ra_csvs(['track-selection.csv'])
+  excluded = get_mp4ra_csvs(['knownduplicates.csv', 'oti.csv', 'stream-types.csv', 'textualcontent.csv', 'unlisted.csv'])
+
+  return {
+    'handler': handlers,
+    'box': boxes,
+    'sample_entry': sample_entries,
+    'brand': brands,
+    'scheme': schemes,
+    'track_group': track_groups,
+    'sample_group': sample_groups,
+    'entity_group': entity_groups,
+    'track_selection': track_selection,
+    'track_reference': track_references,
+    'item_reference': item_references,
+    'data_reference': data_references,
+    'item_property': item_properties,
+    'item_type': item_types,
+    'checksum_type': checksum_types,
+    'color_type': color_types,
+    'multiview_attr': multiview_attributes,
+    'excluded': excluded
+    }
+
+# returns a list of entries like this: [4cc, spec, description, handle, object_type, type]
+def get_mp4ra_csvs(files_array):
   retVal = []
   base_url = 'https://raw.githubusercontent.com/mp4ra/mp4ra.github.io/dev/CSV/'
-  files = ['boxes-qt.csv', 'boxes-udta.csv', 'boxes.csv', 'brands.csv', 'checksum-types.csv', 'color-types.csv', 'data-references.csv', 'entity-groups.csv', 'handlers.csv', 'item-properties.csv', 'item-references.csv', 'item-types.csv', 'multiview-attributes.csv', 'sample-entries-boxes.csv', 'sample-entries-qt.csv', 'sample-entries.csv', 'sample-groups.csv', 'schemes.csv', 'specifications.csv', 'track-groups.csv', 'track-references-qt.csv', 'track-references.csv', 'track-selection.csv' ]
   
-  print_message("Download fccs from mp4ra")
-
-  for f in files:
+  for f in files_array:
     url = base_url + f
     print("Download: {}".format(url))
 
