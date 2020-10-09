@@ -280,6 +280,7 @@ def main():
                                                 "ISO/IEC 14496-30 - text\n"
                                                 "ISO/IEC 23008-12 - heif")
   parser.add_argument("-i", help="Check specific fourcc's, separate multiple with commas, use _ for spaces.")
+  parser.add_argument("-r", help="Root directory of the software", default="IsoLib")
   parser.add_argument("-v", help="Show more infos", action='store_true')
   parser.add_argument("--isobmff", help="Path to ISO/IEC 14496-12 spec docx file")
   parser.add_argument("--mp4", help="Path to ISO/IEC 14496-14 spec docx file")
@@ -288,7 +289,7 @@ def main():
   parser.add_argument("--heif", help="Path to ISO/IEC 23008-12 spec docx file")
   args = parser.parse_args()
 
-  command = 'grep -rnw IsoLib --include=\*.{cpp,c,cc,cs,h,hpp} -e "MP4_FOUR_CHAR_CODE"'
+  command = 'grep -rnw ' + args.r + ' --include=\*.{cpp,c,cc,cs,h,hpp} -e "MP4_FOUR_CHAR_CODE"'
   grep_text = command_to_string( command )
   fccs_sw = get_fourccs_software( grep_text )
 
