@@ -2,6 +2,10 @@ cmake_minimum_required(VERSION 3.9.2)
 
 project(IsoLib)
 
+set(CMAKE_ARCHIVE_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
+set(CMAKE_LIBRARY_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/lib)
+set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_SOURCE_DIR}/bin)
+
 find_package(Git QUIET)
 if(GIT_FOUND AND EXISTS "${PROJECT_SOURCE_DIR}/.git")
   # Update submodules as needed
@@ -42,3 +46,5 @@ add_subdirectory(IsoLib/ipmp_example)
 add_subdirectory(IsoLib/isoiff_tool)
 
 add_subdirectory(IsoLib/pcm_audio_example)
+
+add_subdirectory(IsoLib/raw2mov)
