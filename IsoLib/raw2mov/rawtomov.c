@@ -31,6 +31,7 @@ int startframenumber = 1;
 int maxframes = 0x1000000;
 int framesprocessed = 0;
 char file_format = 'q';
+int force = 0;
 
 u16 color_primaries = 2;
 u16 xfer_function = 2;
@@ -121,6 +122,9 @@ int main( int argc, char **argv )
 				if (argc<=argn) goto bail;
 				matrix_coeffs = atoi(argv[++argn]);
 				do_nclc = 1;
+				break;
+			case 'F':
+				force = 1; 
 				break;
 			default: goto bail;
 		}
@@ -442,12 +446,24 @@ MP4Err set_bytes_per_frame()
 	codec_string[4] = 0;
 
 	switch (codec_type) {
+		case MP4_FOUR_CHAR_CODE( 'I', '4', '2', '0' ):
+		case MP4_FOUR_CHAR_CODE( 'I', 'Y', 'U', 'V' ):
 		case MP4_FOUR_CHAR_CODE( 'j', '4', '2', '0' ):
 		case MP4_FOUR_CHAR_CODE( 'y', 'v', '1', '2' ):
 			bytes_per_frame = ((x_width * y_height * 3)/2);
 			break;
-		case MP4_FOUR_CHAR_CODE( '2', 'v', 'u', 'y' ):
-		case MP4_FOUR_CHAR_CODE( 'y', 'u', 'v', '2' ):
+		case MP4_FOUR_CHAR_CODE( '2', 'v', 'u', 'y' ): 	/* icefloe */
+		case MP4_FOUR_CHAR_CODE( 'y', 'u', 'v', '2' ):	/* icefloe */
+			bytes_per_frame = x_width * y_height * 2;
+			break;
+		case MP4_FOUR_CHAR_CODE( 'r', 'a', 'w', ' ' ):
+		case MP4_FOUR_CHAR_CODE( 'v', '3', '0', '8' ): 	/* icefloe */
+			bytes_per_frame = x_width * y_height * 3;
+			break;
+		case MP4_FOUR_CHAR_CODE( 'v', '4', '0', '8' ):	/* icefloe */
+		case MP4_FOUR_CHAR_CODE( 'v', '4', '1', '0' ):	/* icefloe */
+			bytes_per_frame = x_width * y_height * 4;
+			break;
 		case MP4_FOUR_CHAR_CODE( 'y', 'u', 'v', 's' ):
 		case MP4_FOUR_CHAR_CODE( 'Y', 'V', 'Y', 'U' ):
 		case MP4_FOUR_CHAR_CODE( 'y', 'u', 'v', 'u' ):
@@ -457,13 +473,20 @@ MP4Err set_bytes_per_frame()
 		case MP4_FOUR_CHAR_CODE( 'A', 'B', 'G', 'R' ):
 			bytes_per_frame = (x_width * y_height * 4);
 			break;
-		case MP4_FOUR_CHAR_CODE( 'v', '2', '1', '0' ):
-			bytes_per_frame = ((x_width * y_height * 8)/3);
+		case MP4_FOUR_CHAR_CODE( 'v', '2', '1', '6' ): 		/* icefloe */
+			bytes_per_frame = ((x_width * y_height * 8)/2);
+			break;
+		case MP4_FOUR_CHAR_CODE( 'v', '2', '1', '0' ):		/* icefloe */
+			bytes_per_frame = ((x_width * y_height * 16)/6);
 			break;
 		default:
-			fprintf(stderr, "Error: unknown codec type %s\n",codec_string);
-			return -1;
+			if(!force)
+			{
+				fprintf(stderr, "Error: unknown codec type '%s'\n",codec_string);
+				return -1;
+			}
+			fprintf(stdout, "Warning: unknown codec type '%s'\n",codec_string);
+			bytes_per_frame = x_width * y_height * 3; /* even when not supported write something (too see if we can actually play it.) */
 	}
 	return MP4NoErr;
-	
 }
