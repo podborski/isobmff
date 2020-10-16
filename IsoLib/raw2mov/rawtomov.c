@@ -135,7 +135,7 @@ int main( int argc, char **argv )
 	if (do_import) {
 		err = createMyMovie(  );
 		if (err) fprintf( stderr, "Creating %s failed %d\n", outfile, err );
-		else fprintf(stderr, "%d frames imported into %s with -w %d -h %d -t %d -d %d -c %s -s %d -m %d%s\n",
+		else fprintf(stderr, "%d frames imported into %s with -w %d -h %d -t %d -d %d -c '%s' -s %d -m %d%s\n",
 				framesprocessed,
 				outfile, x_width, y_height, timescale, frameduration, codec_string,
 				startframenumber, maxframes, (by_reference ? " -r" : "") );

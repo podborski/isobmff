@@ -2,16 +2,10 @@ import subprocess
 import sys
 import os
 
-def command_to_string(command):
-  cmd = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
-  cmd_out, cmd_err = cmd.communicate()
-  if not cmd_err == None:
-    print("ERROR while executing {}\n\nstderr:\n{}".format(command, cmd_err))
-    sys.exit(-1)
-  return cmd_out.decode("utf-8")
 
-# all ffmpeg pix_fmts with Output flag set
-fmts = [
+
+# all `ffmpeg -pix_fmts` with Output flag set
+ffmpeg_output_fmts = [
   'yuv420p',
   'yuyv422',
   'rgb24',
@@ -174,21 +168,8 @@ fmts = [
   'nv42'
 ]
 
-def create_uncompressed_files(root_dir):
-  print('Generate {} different formats:\n'.format(len(fmts)))
-
-  if not os.path.exists(root_dir):
-    os.makedirs(root_dir)
-
-  for fmt in fmts:
-    print('Create format ' + fmt)
-    out_file = os.path.join(root_dir, fmt+'_qcif.raw')
-    # -loglevel panic
-    cmd = 'ffmpeg -y -hide_banner -f lavfi -i testsrc=duration=2:size=qcif:rate=30 -s qcif -pix_fmt {} -f rawvideo {}'.format(fmt, out_file)
-    command_to_string(cmd)
-
-
-test_fmts = [
+# 4CC to uncompressed file mapping
+format_to_file = [
   ['2vuy', 'uyvy422_qcif.raw'],
   ['yuv2', 'yuyv422_qcif.raw'],
   ['v308', 'rgb24_qcif.raw'],       # ffmpeg can't generate packed CrYCb, I take packed RGB
@@ -206,17 +187,40 @@ test_fmts = [
   ['ABGR', 'abgr_qcif.raw']
 ]
 
+def command_to_string(command):
+  cmd = subprocess.Popen(command, stdout=subprocess.PIPE, shell=True)
+  cmd_out, cmd_err = cmd.communicate()
+  if not cmd_err == None:
+    print("ERROR while executing {}\n\nstderr:\n{}".format(command, cmd_err))
+    sys.exit(-1)
+  return cmd_out.decode("utf-8")
+
+def create_uncompressed_files(root_dir):
+  banner = '\nGenerate {} uncompressed files:'.format(len(ffmpeg_output_fmts))
+  print(banner)
+  print('-'*len(banner))
+  if not os.path.exists(root_dir):
+    os.makedirs(root_dir)
+
+  for fmt in ffmpeg_output_fmts:
+    print('Uncompressed format ' + fmt)
+    out_file = os.path.join(root_dir, fmt+'_qcif.raw')
+    cmd = 'ffmpeg -y -loglevel panic -hide_banner -f lavfi -i testsrc=duration=2:size=qcif:rate=30 -s qcif -pix_fmt {} -f rawvideo {}'.format(fmt, out_file)
+    command_to_string(cmd)
+
 def package_uncompressed_files(in_dir, out_dir):
+  banner = '\nPackage {} uncompressed files:'.format(len(format_to_file))
+  print(banner)
+  print('-'*len(banner))
   if not os.path.exists(in_dir):
     os.makedirs(in_dir)
   if not os.path.exists(out_dir):
     os.makedirs(out_dir)
-  for fmt in test_fmts:
-    print(fmt)
-    in_file = os.path.join(in_dir, fmt[1])
-    out_file = os.path.join(out_dir, '{}.mp4'.format(fmt[0]).replace(' ', '_'))
-    # -loglevel panic
-    cmd = "./bin/raw2mov {} {} -w 176 -h 144 -c '{}' -p 2".format(in_file, out_file, fmt[0])
+  for fmt, raw_file in format_to_file:
+    print("Package {:<20} to mov with 4CC='{}'".format(raw_file, fmt))
+    in_file = os.path.join(in_dir, raw_file)
+    out_file = os.path.join(out_dir, fmt.replace(' ', '_') + '.mov')
+    cmd = "./bin/raw2mov {} {} -w 176 -h 144 -c '{}' -p 2".format(in_file, out_file, fmt)
     command_to_string(cmd)
 
 create_uncompressed_files('./bin/uncompressed')
