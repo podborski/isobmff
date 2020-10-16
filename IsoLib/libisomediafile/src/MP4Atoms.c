@@ -39,6 +39,8 @@
 #include "MJ2Atoms.h"
 #endif
 
+MP4Err MP4CreateHEVCConfigAtom(ISOHEVCConfigAtomPtr *outAtom);
+
 static MP4AtomPtr MP4BaseAtomClassPtr = 0;
 
 static char* baseAtomGetName( MP4AtomPtr self )
