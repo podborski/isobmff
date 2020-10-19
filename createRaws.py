@@ -168,11 +168,9 @@ fcc_to_fmt = [
   ['v308', 'v308_uyv444'],
   ['v308', 'gst_v308'],
   ['v408', 'v408_vyua4444'],
-  ['v216', 'ffmpeg_uyvy422'],      # ... packed k422YpCbCr16CodecType 32bpp, I take uyvy422 with 16bpp       yuv422p16le
   ['v216', 'gst_v216'],
   ['v410', 'ffmpeg_rgba'],         # ... packed k444YpCbCr10CodecType, I take rgba instead
   ['v410', 'gst_Y410'],
-  ['v210', 'ffmpeg_yuv422p10be'],  # ... packed k422YpCbCr10CodecType,
   ['v210', 'gst_v210'], 
   ['raw ', 'ffmpeg_rgb24'],
   ['j420', 'ffmpeg_yuv420p'],

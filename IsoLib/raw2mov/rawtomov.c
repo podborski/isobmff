@@ -441,6 +441,7 @@ bail:
 
 MP4Err set_bytes_per_frame()
 {
+	u32 horiz_align_pixels = 2;
 	codec_string[0] = (codec_type>>24) & 0xFF; codec_string[1] = (codec_type>>16) & 0xFF;
 	codec_string[2] = (codec_type>> 8) & 0xFF; codec_string[3] =  codec_type      & 0xFF;
 	codec_string[4] = 0;
@@ -477,7 +478,9 @@ MP4Err set_bytes_per_frame()
 			bytes_per_frame = ((x_width * y_height * 8)/2);
 			break;
 		case MP4_FOUR_CHAR_CODE( 'v', '2', '1', '0' ):		/* icefloe */
-			bytes_per_frame = ((x_width * y_height * 16)/6);
+			horiz_align_pixels = 48;
+			if(x_width%horiz_align_pixels) bytes_per_frame = (((x_width/horiz_align_pixels) + 1) * horiz_align_pixels * y_height * 16) / 6;
+			else bytes_per_frame = ((x_width * y_height * 16)/6);
 			break;
 		default:
 			if(!force)
