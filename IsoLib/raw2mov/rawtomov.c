@@ -453,6 +453,7 @@ MP4Err set_bytes_per_frame()
 		case MP4_FOUR_CHAR_CODE( 'y', 'v', '1', '2' ):
 			bytes_per_frame = ((x_width * y_height * 3)/2);
 			break;
+		case MP4_FOUR_CHAR_CODE( 'D', 'V', 'O', 'O' ):  /* Digital Voodoo 8 bit 4:2:2 */
 		case MP4_FOUR_CHAR_CODE( '2', 'v', 'u', 'y' ): 	/* icefloe */
 		case MP4_FOUR_CHAR_CODE( 'y', 'u', 'v', '2' ):	/* icefloe */
 			bytes_per_frame = x_width * y_height * 2;
