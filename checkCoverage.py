@@ -50,6 +50,8 @@ def get_fourccs_software(full_text):
     temp = temp.replace('(', '')
     temp = temp.replace(',', '')
     temp = temp.strip()
+    if len(temp) == 0:
+      continue
     if not temp[0] == '\'':
       continue
     fcc = temp[1] + temp[5] + temp[9] + temp[13]
